@@ -1,0 +1,10 @@
+[package]
+name = "nix-simple-deploy"
+version = "0.1.0"
+description = "Deploy software or an entire NixOS system configuration to another NixOS system"
+authors = ["misuzu <bakalolka@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.0"
+cmd_lib = "0.7.8"
