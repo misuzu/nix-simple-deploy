@@ -148,7 +148,7 @@ fn main() {
                         .help(
                             "When set, nix-simple-deploy prefixes local commands \
                              that requires privileges with sudo. \
-                             Setting this option allows deploying as a non-root user",
+                             Setting this option allows deploying using local non-root user",
                         ),
                 )
                 .arg(
