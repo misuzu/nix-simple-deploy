@@ -41,7 +41,7 @@ fn deploy_system(
     let profile_path = match action {
         "switch" | "boot" | "reboot" => {
             if profile == "system" {
-                format!("/nix/var/nix/profiles/system")
+                "/nix/var/nix/profiles/system".to_string()
             } else {
                 format!("/nix/var/nix/profiles/system-profiles/{}", profile)
             }
