@@ -3,6 +3,12 @@ name = "nix-simple-deploy"
 version = "0.1.0"
 description = "Deploy software or an entire NixOS system configuration to another NixOS system"
 authors = ["misuzu <bakalolka@gmail.com>"]
+categories = ["command-line-interface", "command-line-utilities"]
+keywords = ["nix", "nixos", "devops"]
+homepage = "https://github.com/misuzu/nix-simple-deploy"
+repository = "https://github.com/misuzu/nix-simple-deploy"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
 edition = "2018"
 
 [dependencies]
@@ -10,7 +16,7 @@ clap = "2.33.0"
 cmd_lib = "0.7.8"
 
 [profile.release]
-opt-level = 'z'  # Optimize for size.
-lto = true
 codegen-units = 1
+lto = true
+opt-level = 'z'
 panic = 'abort'
