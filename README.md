@@ -1,4 +1,7 @@
-# `nix-simple-deploy`
+nix-simple-deploy
+=================
+![](https://github.com/misuzu/nix-simple-deploy/workflows/Continuous%20integration/badge.svg) [![Crates.io](https://img.shields.io/crates/v/nix-simple-deploy.svg)](https://crates.io/crates/nix-simple-deploy) [![Crates.io](https://img.shields.io/crates/d/nix-simple-deploy.svg)](https://crates.io/crates/nix-simple-deploy)
+
 Deploy a NixOS system configuration with `nix-simple-deploy system ...` to a remote
 machine and switch the machine to that system configuration. You can also deploy
 a nix store path with `nix-simple-deploy path ...` to a remote machine.
