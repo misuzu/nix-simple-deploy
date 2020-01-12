@@ -38,26 +38,26 @@ fn deploy_system(
     } else {
         format!("ssh {}", target_host)
     };
-    let profile_path = match action {
-        "switch" | "boot" | "reboot" => {
-            if profile == "system" {
+    let remote_action = if action == "reboot" { "boot" } else { action };
+    let profile_path = match remote_action {
+        "switch" | "boot" => {
+            let profile_path = if profile == "system" {
                 "/nix/var/nix/profiles/system".to_string()
             } else {
                 format!("/nix/var/nix/profiles/system-profiles/{}", profile)
-            }
+            };
+            run_cmd!("{} nix-env -p {} --set {}", ssh_tool, profile_path, path)?;
+            profile_path
         }
         _ => path.to_string(),
     };
-    if action != "test" && action != "dry-activate" {
-        run_cmd!("{} nix-env -p {} --set {}", ssh_tool, profile_path, path)?;
-    }
-    let remote_action = if action == "reboot" { "boot" } else { action };
     run_cmd!(
         "{} {}/bin/switch-to-configuration {}",
         ssh_tool,
         profile_path,
         remote_action
     )?;
+
     if action == "reboot" {
         run_cmd!("{} reboot", ssh_tool)?;
     }
