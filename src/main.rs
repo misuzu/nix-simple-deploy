@@ -1,6 +1,7 @@
 use clap::*;
 use cmd_lib::run_cmd;
 use std::io;
+use std::process::exit;
 
 fn deploy_path(
     path: &str,
@@ -177,26 +178,22 @@ fn main() {
         )
         .get_matches();
 
-    match matches.subcommand() {
-        ("path", Some(path_matches)) => {
-            deploy_path(
-                path_matches.value_of("PATH").unwrap(),
-                path_matches.value_of("signing-key").unwrap(),
-                path_matches.value_of("target-host").unwrap(),
-                path_matches.is_present("use-substitutes"),
-                path_matches.is_present("use-local-sudo"),
-            )
-            .unwrap();
-        }
-        ("system", Some(system_matches)) => {
-            deploy_path(
-                system_matches.value_of("PATH").unwrap(),
-                system_matches.value_of("signing-key").unwrap(),
-                system_matches.value_of("target-host").unwrap(),
-                system_matches.is_present("use-substitutes"),
-                system_matches.is_present("use-local-sudo"),
-            )
-            .unwrap();
+    let result = match matches.subcommand() {
+        ("path", Some(path_matches)) => deploy_path(
+            path_matches.value_of("PATH").unwrap(),
+            path_matches.value_of("signing-key").unwrap(),
+            path_matches.value_of("target-host").unwrap(),
+            path_matches.is_present("use-substitutes"),
+            path_matches.is_present("use-local-sudo"),
+        ),
+        ("system", Some(system_matches)) => deploy_path(
+            system_matches.value_of("PATH").unwrap(),
+            system_matches.value_of("signing-key").unwrap(),
+            system_matches.value_of("target-host").unwrap(),
+            system_matches.is_present("use-substitutes"),
+            system_matches.is_present("use-local-sudo"),
+        )
+        .and_then(|_| {
             deploy_system(
                 system_matches.value_of("PATH").unwrap(),
                 system_matches.value_of("target-host").unwrap(),
@@ -204,8 +201,11 @@ fn main() {
                 system_matches.value_of("ACTION").unwrap(),
                 system_matches.value_of("profile").unwrap(),
             )
-            .unwrap();
-        }
+        }),
         _ => unreachable!(),
+    };
+    if let Err(e) = result {
+        println!("Error occured while running: {}", e);
+        exit(1);
     }
 }
