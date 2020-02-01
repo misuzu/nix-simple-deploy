@@ -59,7 +59,7 @@ fn deploy_system(
     )?;
 
     if action == "reboot" {
-        run_cmd!("{} reboot", ssh_tool)?;
+        let _ = run_cmd!("{} reboot", ssh_tool);
     }
 
     Ok(())
