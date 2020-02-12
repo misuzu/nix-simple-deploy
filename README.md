@@ -51,6 +51,14 @@ $ cargo run -- --help
 ```
 
 
+You can also add `nix-simple-deploy` to your `environment.systemPackages`:
+```nix
+environment.systemPackages = [
+  (pkgs.callPackage ./nix-simple-deploy.nix { })
+];
+```
+
+
 Help output:
 ```bash
 $ nix-simple-deploy --help
