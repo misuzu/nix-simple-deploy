@@ -2,11 +2,15 @@ nix-simple-deploy
 =================
 ![](https://github.com/misuzu/nix-simple-deploy/workflows/Continuous%20integration/badge.svg) [![Crates.io](https://img.shields.io/crates/v/nix-simple-deploy.svg)](https://crates.io/crates/nix-simple-deploy) [![Crates.io](https://img.shields.io/crates/d/nix-simple-deploy.svg)](https://crates.io/crates/nix-simple-deploy)
 
+## About
+
 Deploy a NixOS system configuration with `nix-simple-deploy system ...` to a remote
 machine and switch the machine to that system configuration. You can also deploy
 a nix store path with `nix-simple-deploy path ...` to a remote machine.
 
 This is a Rust rewrite of unmaintained [nix-deploy](https://github.com/awakesecurity/nix-deploy).
+
+## Usage
 
 To get started generate signing key first:
 ```bash
@@ -43,6 +47,7 @@ $ nix-simple-deploy system \
 The above example will not actually work, you must provide nix path for proper system closure.
 Check ```APPENDIX B``` in [Deploy software easily and securely using nix-deploy](https://ixmatus.net/articles/deploy-software-nix-deploy.html).
 
+## Install
 
 To run ```nix-simple-deploy``` from git tree run:
 ```bash
@@ -50,18 +55,28 @@ $ nix-shell -p cargo
 $ cargo run -- --help
 ```
 
+You can also build `nix-simple-deploy` directly from provided `default.nix` expression from this repo. Just setup `rev` value and appropriate `sha256`:
 
-You can also add `nix-simple-deploy` to your `environment.systemPackages`:
+```nix
+nix-simple-deploy = pkgs.callPackage (pkgs.fetchFromGitHub {
+  rev = "...";
+  owner = "misuzu";
+  repo = "nix-simple-deploy";
+  sha256 = "...";
+}) {}
+```
+Then you can add it to your `shell.nix` `buildInputs` or system wide into `environment.systemPackages`:
+
 ```nix
 {
   environment.systemPackages = [
-    (pkgs.callPackage ./nix-simple-deploy.nix { })
+    nix-simple-deploy
   ];
 }
 ```
 
+## Help output
 
-Help output:
 ```bash
 $ nix-simple-deploy --help
 Deploy software or an entire NixOS system configuration to another NixOS system

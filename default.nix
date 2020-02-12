@@ -5,14 +5,9 @@
 { stdenv, fetchFromGitHub, rustPlatform }:
 rustPlatform.buildRustPackage rec {
   pname = "nix-simple-deploy";
+  src = ./.;
   version = "0.1.1";
-  src = fetchFromGitHub {
-    owner = "misuzu";
-    repo = pname;
-    rev = version;
-    sha256 = "12g0sbgs2dfnk0agp1kagfi1yhk26ga98zygxxrjhjxrqb2n5w80";
-  };
-  cargoSha256 = "02v8lrwjai45bkm69cd98s5wlvq8w5yz4wfzf7bjcv6n61k05n6f";
+  cargoSha256 = "1v0xga8bnxlgn23gphprrpyl38a2l2f6si8zfph532pgckx8d10s";
   verifyCargoDeps = true;
   meta = with stdenv.lib; {
     description = "Deploy software or an entire NixOS system configuration to another NixOS system";
