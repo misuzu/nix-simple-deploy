@@ -24,7 +24,9 @@ Then add contents of ```signing-key.pub``` to remote's ```configuration.nix``` a
 }
 ```
 
-Now you are ready to deploy stuff:
+Now you are ready to deploy stuff!
+
+To simply copy some store path use `nix-simple-deploy path`:
 ```bash
 $ nix-simple-deploy path \
   --use-local-sudo \
@@ -34,20 +36,33 @@ $ nix-simple-deploy path \
   $(type -p firefox)
 ```
 
+To deploy whole system use `nix-simple-deploy system`:
 ```bash
+# copy hardware configuration from remote host to hardware-configuration.nix
+$ ssh user@remote-server nixos-generate-config --show-hardware-config > ./hardware-configuration.nix
+# build system from configuration.nix
+$ nix-build '<nixpkgs/nixos>' -Q -A system -I nixos-config=./configuration.nix
+# deploy system to remote host
 $ nix-simple-deploy system \
   --use-local-sudo \
   --use-remote-sudo \
   --use-substitutes \
   --signing-key signing-key.sec \
   --target-host user@remote-server \
-  /run/current-system \
+  $(readlink -f ./result) \
   switch
 ```
-The above example will not actually work, you must provide nix path for proper system closure.
-Check ```APPENDIX B``` in [Deploy software easily and securely using nix-deploy](https://ixmatus.net/articles/deploy-software-nix-deploy.html).
 
 ## Install
+
+Just add it to `environment.systemPackages` (nixpkgs-unstable):
+```nix
+{
+  environment.systemPackages = [
+    pkgs.nix-simple-deploy
+  ];
+}
+```
 
 To run ```nix-simple-deploy``` from git tree run:
 ```bash
@@ -58,12 +73,14 @@ $ cargo run -- --help
 You can also build `nix-simple-deploy` directly from provided `default.nix` expression from this repo. Just setup `rev` value and appropriate `sha256`:
 
 ```nix
-nix-simple-deploy = pkgs.callPackage (pkgs.fetchFromGitHub {
-  rev = "...";
-  owner = "misuzu";
-  repo = "nix-simple-deploy";
-  sha256 = "...";
-}) {}
+{
+  nix-simple-deploy = pkgs.callPackage (pkgs.fetchFromGitHub {
+    rev = "...";
+    owner = "misuzu";
+    repo = "nix-simple-deploy";
+    sha256 = "...";
+  }) {};
+}
 ```
 Then you can add it to your `shell.nix` `buildInputs` or system wide into `environment.systemPackages`:
 
