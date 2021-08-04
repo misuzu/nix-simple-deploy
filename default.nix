@@ -2,18 +2,26 @@
 # environment.systemPackages = [
 #   (pkgs.callPackage ./nix-simple-deploy.nix { })
 # ];
-{ stdenv, fetchFromGitHub, rustPlatform }:
+{ lib, fetchFromGitHub, rustPlatform, makeWrapper, openssh, nix-serve }:
 rustPlatform.buildRustPackage rec {
   pname = "nix-simple-deploy";
+  version = "0.2.0";
+
   src = ./.;
-  version = "0.1.1";
-  cargoSha256 = "1v0xga8bnxlgn23gphprrpyl38a2l2f6si8zfph532pgckx8d10s";
-  verifyCargoDeps = true;
-  meta = with stdenv.lib; {
+
+  cargoSha256 = "1n6q962lbrlmj7p2i290jww65a0s9xckf1pnqyn43fpx4a9ibqaa";
+
+  nativeBuildInputs = [ makeWrapper ];
+
+  postInstall = ''
+    wrapProgram "$out/bin/nix-simple-deploy" \
+      --prefix PATH : "${lib.makeBinPath [ openssh nix-serve ]}"
+  '';
+
+  meta = with lib; {
     description = "Deploy software or an entire NixOS system configuration to another NixOS system";
     homepage = "https://github.com/misuzu/nix-simple-deploy";
-    license = with licenses; [ mit ];
-    platforms = platforms.all;
+    license = with licenses; [ asl20 /* OR */ mit ];
     maintainers = with maintainers; [ misuzu ];
   };
 }

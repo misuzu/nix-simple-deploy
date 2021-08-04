@@ -1,65 +1,125 @@
 use clap::*;
-use cmd_lib::run_cmd;
-use std::io;
+use subprocess::{Exec, NullFile, Result};
+
+use std::fs;
 use std::process::exit;
+use std::time;
+
+fn get_ssh_tool(target_host: &str, nix_serve_port: u16, use_remote_sudo: bool) -> String {
+    if use_remote_sudo {
+        format!(
+            "ssh -R {}:127.0.0.1:{} {} sudo",
+            nix_serve_port, nix_serve_port, target_host
+        )
+    } else {
+        format!(
+            "ssh -R {}:127.0.0.1:{} {}",
+            nix_serve_port, nix_serve_port, target_host
+        )
+    }
+}
 
 fn deploy_path(
+    ssh_tool: &str,
+    nix_serve_port: u16,
+    use_substitutes: bool,
     path: &str,
     signing_key: &str,
-    target_host: &str,
-    use_substitutes: bool,
-    use_local_sudo: bool,
-) -> io::Result<()> {
-    let sign_tool = if use_local_sudo {
-        "sudo nix sign-paths"
-    } else {
-        "nix sign-paths"
-    };
-    let copy_tool = if use_substitutes {
-        "nix copy -s"
-    } else {
-        "nix copy"
-    };
-    run_cmd!("{} -r -k {} {}", sign_tool, signing_key, path)?;
-    run_cmd!("{} --to ssh://{} {}", copy_tool, target_host, path)?;
+    profile_path: Option<&str>,
+) -> Result<()> {
+    let cmd = Exec::cmd("nix-serve")
+        .arg("-p")
+        .arg(nix_serve_port.to_string())
+        .env("NIX_SECRET_KEY_FILE", signing_key)
+        .stdout(NullFile)
+        .stderr(NullFile);
+    match cmd.popen() {
+        Ok(ref mut nix_serve) => {
+            let path = fs::read_link(path)
+                .unwrap_or_else(|_| path.into())
+                .as_path()
+                .display()
+                .to_string();
 
-    Ok(())
+            let cmd = if let Some(profile_path) = profile_path {
+                format!(
+                    "{} nix-env --{}substituters http://127.0.0.1:{} -p {} --set {}",
+                    ssh_tool,
+                    (if use_substitutes { "extra-" } else { "" }),
+                    nix_serve_port,
+                    profile_path,
+                    path
+                )
+            } else {
+                format!(
+                    "{} nix build --print-missing -v --no-link --option {}substituters http://127.0.0.1:{} {}",
+                    ssh_tool,
+                    (if use_substitutes { "extra-" } else { "" }),
+                    nix_serve_port,
+                    path
+                )
+            };
+
+            let exit_status = Exec::shell(cmd).join()?;
+
+            nix_serve.terminate()?;
+
+            if !exit_status.success() {
+                exit(1);
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            println!("Error while starting nix-serve:");
+            Err(e)
+        }
+    }
 }
 
 fn deploy_system(
+    ssh_tool: &str,
+    nix_serve_port: u16,
+    use_substitutes: bool,
     path: &str,
-    target_host: &str,
-    use_remote_sudo: bool,
+    signing_key: &str,
     action: &str,
-    profile: &str,
-) -> io::Result<()> {
-    let ssh_tool = if use_remote_sudo {
-        format!("ssh {} sudo", target_host)
-    } else {
-        format!("ssh {}", target_host)
-    };
+    profile_path: &str,
+) -> Result<()> {
     let remote_action = if action == "reboot" { "boot" } else { action };
+
     let profile_path = match remote_action {
-        "switch" | "boot" => {
-            let profile_path = if profile == "system" {
-                "/nix/var/nix/profiles/system".to_string()
-            } else {
-                format!("/nix/var/nix/profiles/system-profiles/{}", profile)
-            };
-            run_cmd!("{} nix-env -p {} --set {}", ssh_tool, profile_path, path)?;
-            profile_path
-        }
-        _ => path.to_string(),
+        "switch" | "boot" => Some(profile_path),
+        _ => None,
     };
-    run_cmd!(
-        "{} {}/bin/switch-to-configuration {}",
+
+    deploy_path(
         ssh_tool,
-        profile_path,
-        remote_action
+        nix_serve_port,
+        use_substitutes,
+        path,
+        signing_key,
+        profile_path.as_deref(),
     )?;
 
+    let cmd = format!(
+        "{} {}/bin/switch-to-configuration {}",
+        ssh_tool,
+        profile_path.as_deref().unwrap_or(path),
+        remote_action
+    );
+
+    let exit_status = Exec::shell(cmd).join()?;
+
+    if !exit_status.success() {
+        exit(1);
+    }
+
     if action == "reboot" {
-        let _ = run_cmd!("{} reboot", ssh_tool);
+        let mut p = Exec::shell(format!("{} reboot", ssh_tool))
+            .detached()
+            .popen()?;
+        let _ = p.wait_timeout(time::Duration::from_secs(10));
     }
 
     Ok(())
@@ -83,6 +143,18 @@ fn main() {
                         .required(true),
                 )
                 .arg(
+                    Arg::with_name("nix-serve-port")
+                        .short("n")
+                        .long("nix-serve-port")
+                        .help(
+                            "Port used for nix-serve, use this option \
+                              if you have other services that use this port \
+                              on local or remote machine",
+                        )
+                        .default_value("8080")
+                        .required(true),
+                )
+                .arg(
                     Arg::with_name("signing-key")
                         .short("k")
                         .long("signing-key")
@@ -102,13 +174,19 @@ fn main() {
                         ),
                 )
                 .arg(
-                    Arg::with_name("use-local-sudo")
-                        .long("use-local-sudo")
+                    Arg::with_name("use-remote-sudo")
+                        .long("use-remote-sudo")
                         .help(
-                            "When set, nix-simple-deploy prefixes local commands \
-                             that requires privileges with sudo. \
-                             Setting this option allows deploying using local non-root user",
+                            "When set, nix-simple-deploy prefixes remote commands \
+                             that run on the --target-host systems with sudo. \
+                             Setting this option allows deploying using remote non-root user",
                         ),
+                )
+                .arg(
+                    Arg::with_name("profile-path")
+                        .short("p")
+                        .long("profile-path")
+                        .help("Profile path"),
                 )
                 .arg(Arg::with_name("PATH").help("Nix store path").required(true)),
         )
@@ -124,6 +202,18 @@ fn main() {
                         .required(true),
                 )
                 .arg(
+                    Arg::with_name("nix-serve-port")
+                        .short("n")
+                        .long("nix-serve-port")
+                        .help(
+                            "Port used for nix-serve, use this option \
+                              if you have other services that use port 9999 \
+                              on local or remote machine",
+                        )
+                        .default_value("9999")
+                        .required(true),
+                )
+                .arg(
                     Arg::with_name("signing-key")
                         .short("k")
                         .long("signing-key")
@@ -143,15 +233,6 @@ fn main() {
                         ),
                 )
                 .arg(
-                    Arg::with_name("use-local-sudo")
-                        .long("use-local-sudo")
-                        .help(
-                            "When set, nix-simple-deploy prefixes local commands \
-                             that requires privileges with sudo. \
-                             Setting this option allows deploying using local non-root user",
-                        ),
-                )
-                .arg(
                     Arg::with_name("use-remote-sudo")
                         .long("use-remote-sudo")
                         .help(
@@ -161,11 +242,11 @@ fn main() {
                         ),
                 )
                 .arg(
-                    Arg::with_name("profile")
+                    Arg::with_name("profile-path")
                         .short("p")
-                        .long("profile")
-                        .help("Profile name")
-                        .default_value("system")
+                        .long("profile-path")
+                        .help("Profile path")
+                        .default_value("/nix/var/nix/profiles/system")
                         .required(true),
                 )
                 .arg(Arg::with_name("PATH").help("Nix store path").required(true))
@@ -180,32 +261,50 @@ fn main() {
 
     let result = match matches.subcommand() {
         ("path", Some(path_matches)) => deploy_path(
+            &get_ssh_tool(
+                path_matches.value_of("target-host").unwrap(),
+                path_matches
+                    .value_of("nix-serve-port")
+                    .unwrap()
+                    .parse()
+                    .unwrap(),
+                path_matches.is_present("use-remote-sudo"),
+            ),
+            path_matches
+                .value_of("nix-serve-port")
+                .unwrap()
+                .parse()
+                .unwrap(),
+            path_matches.is_present("use-substitutes"),
             path_matches.value_of("PATH").unwrap(),
             path_matches.value_of("signing-key").unwrap(),
-            path_matches.value_of("target-host").unwrap(),
-            path_matches.is_present("use-substitutes"),
-            path_matches.is_present("use-local-sudo"),
+            path_matches.value_of("profile-path"),
         ),
-        ("system", Some(system_matches)) => deploy_path(
+        ("system", Some(system_matches)) => deploy_system(
+            &get_ssh_tool(
+                system_matches.value_of("target-host").unwrap(),
+                system_matches
+                    .value_of("nix-serve-port")
+                    .unwrap()
+                    .parse()
+                    .unwrap(),
+                system_matches.is_present("use-remote-sudo"),
+            ),
+            system_matches
+                .value_of("nix-serve-port")
+                .unwrap()
+                .parse()
+                .unwrap(),
+            system_matches.is_present("use-substitutes"),
             system_matches.value_of("PATH").unwrap(),
             system_matches.value_of("signing-key").unwrap(),
-            system_matches.value_of("target-host").unwrap(),
-            system_matches.is_present("use-substitutes"),
-            system_matches.is_present("use-local-sudo"),
-        )
-        .and_then(|_| {
-            deploy_system(
-                system_matches.value_of("PATH").unwrap(),
-                system_matches.value_of("target-host").unwrap(),
-                system_matches.is_present("use-remote-sudo"),
-                system_matches.value_of("ACTION").unwrap(),
-                system_matches.value_of("profile").unwrap(),
-            )
-        }),
+            system_matches.value_of("ACTION").unwrap(),
+            system_matches.value_of("profile-path").unwrap(),
+        ),
         _ => unreachable!(),
     };
     if let Err(e) = result {
-        println!("Error occured while running: {}", e);
+        println!("{}", e);
         exit(1);
     }
 }
