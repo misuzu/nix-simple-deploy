@@ -35,6 +35,11 @@ fn deploy_path(
         .stderr(NullFile);
     match cmd.popen() {
         Ok(ref mut nix_serve) => {
+            if let Some(exit_status) = nix_serve.wait_timeout(time::Duration::from_secs(1))? {
+                println!("nix-serve exited too early: {:?}", exit_status);
+                exit(1);
+            };
+
             let path = fs::read_link(path)
                 .unwrap_or_else(|_| path.into())
                 .as_path()
