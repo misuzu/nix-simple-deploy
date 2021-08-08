@@ -1,6 +1,6 @@
 [package]
 name = "nix-simple-deploy"
-version = "0.2.0"
+version = "0.2.1"
 description = "Deploy software or an entire NixOS system configuration to another NixOS system"
 authors = ["misuzu <bakalolka@gmail.com>"]
 categories = ["command-line-interface", "command-line-utilities"]
