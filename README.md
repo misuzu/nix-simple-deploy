@@ -128,7 +128,7 @@ FLAGS:
 
 OPTIONS:
     -n, --nix-serve-port <nix-serve-port>       Port used for nix-serve, use this option if you have other services that
-                                                use this port on local or remote machine [default: 8080]
+                                                use port 9999 on local or remote machine [default: 9999]
     -k, --signing-key </path/to/signing-key>    File containing the secret signing key
     -t, --target-host <USER@HOST>               Specifies the NixOS target host
 

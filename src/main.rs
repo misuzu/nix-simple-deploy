@@ -148,10 +148,10 @@ fn main() {
                         .long("nix-serve-port")
                         .help(
                             "Port used for nix-serve, use this option \
-                              if you have other services that use this port \
+                              if you have other services that use port 9999 \
                               on local or remote machine",
                         )
-                        .default_value("8080")
+                        .default_value("9999")
                         .required(true),
                 )
                 .arg(
