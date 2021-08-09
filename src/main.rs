@@ -24,15 +24,17 @@ fn deploy_path(
     nix_serve_port: u16,
     use_substitutes: bool,
     path: &str,
-    signing_key: &str,
+    signing_key: Option<&str>,
     profile_path: Option<&str>,
 ) -> Result<()> {
-    let cmd = Exec::cmd("nix-serve")
+    let mut cmd = Exec::cmd("nix-serve")
         .arg("-p")
         .arg(nix_serve_port.to_string())
-        .env("NIX_SECRET_KEY_FILE", signing_key)
         .stdout(NullFile)
         .stderr(NullFile);
+    if let Some(key_path) = signing_key {
+        cmd = cmd.env("NIX_SECRET_KEY_FILE", key_path);
+    };
     match cmd.popen() {
         Ok(ref mut nix_serve) => {
             if let Some(exit_status) = nix_serve.wait_timeout(time::Duration::from_secs(1))? {
@@ -48,19 +50,21 @@ fn deploy_path(
 
             let cmd = if let Some(profile_path) = profile_path {
                 format!(
-                    "{} nix-env --{}substituters http://127.0.0.1:{} -p {} --set {}",
+                    "{} nix-env --option {}substituters http://127.0.0.1:{} {} -p {} --set {}",
                     ssh_tool,
                     (if use_substitutes { "extra-" } else { "" }),
                     nix_serve_port,
+                    signing_key.map_or("--option require-sigs false", |_| ""),
                     profile_path,
                     path
                 )
             } else {
                 format!(
-                    "{} nix build --print-missing -v --no-link --option {}substituters http://127.0.0.1:{} {}",
+                    "{} nix build --option {}substituters http://127.0.0.1:{} {} --print-missing -v --no-link {}",
                     ssh_tool,
                     (if use_substitutes { "extra-" } else { "" }),
                     nix_serve_port,
+                    signing_key.map_or("--option require-sigs false", |_| ""),
                     path
                 )
             };
@@ -87,7 +91,7 @@ fn deploy_system(
     nix_serve_port: u16,
     use_substitutes: bool,
     path: &str,
-    signing_key: &str,
+    signing_key: Option<&str>,
     action: &str,
     profile_path: &str,
 ) -> Result<()> {
@@ -164,8 +168,7 @@ fn main() {
                         .short("k")
                         .long("signing-key")
                         .help("File containing the secret signing key")
-                        .value_name("/path/to/signing-key")
-                        .required(true),
+                        .value_name("/path/to/signing-key"),
                 )
                 .arg(
                     Arg::with_name("use-substitutes")
@@ -223,8 +226,7 @@ fn main() {
                         .short("k")
                         .long("signing-key")
                         .help("File containing the secret signing key")
-                        .value_name("/path/to/signing-key")
-                        .required(true),
+                        .value_name("/path/to/signing-key"),
                 )
                 .arg(
                     Arg::with_name("use-substitutes")
@@ -282,7 +284,7 @@ fn main() {
                 .unwrap(),
             path_matches.is_present("use-substitutes"),
             path_matches.value_of("PATH").unwrap(),
-            path_matches.value_of("signing-key").unwrap(),
+            path_matches.value_of("signing-key"),
             path_matches.value_of("profile-path"),
         ),
         ("system", Some(system_matches)) => deploy_system(
@@ -302,7 +304,7 @@ fn main() {
                 .unwrap(),
             system_matches.is_present("use-substitutes"),
             system_matches.value_of("PATH").unwrap(),
-            system_matches.value_of("signing-key").unwrap(),
+            system_matches.value_of("signing-key"),
             system_matches.value_of("ACTION").unwrap(),
             system_matches.value_of("profile-path").unwrap(),
         ),
