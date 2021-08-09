@@ -132,6 +132,7 @@ OPTIONS:
             machine [default: 9999]
     -p, --profile-path </path/to/nix/profile>    Profile path
     -k, --signing-key </path/to/signing-key>     File containing the secret signing key
+        --store </mnt>                           Use different nix store root
     -t, --target-host <USER@HOST>                Specifies the NixOS target host
 
 ARGS:

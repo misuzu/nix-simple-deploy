@@ -31,6 +31,7 @@ fn deploy_path(
     use_substitutes: bool,
     path: &str,
     signing_key: Option<&str>,
+    store: Option<&str>,
     profile_path: Option<&str>,
 ) -> Result<()> {
     let mut cmd = Exec::cmd("nix-serve")
@@ -56,21 +57,23 @@ fn deploy_path(
 
             let cmd = if let Some(profile_path) = profile_path {
                 format!(
-                    "{} nix-env --option {}substituters http://127.0.0.1:{} {} -p {} --set {}",
+                    "{} nix-env --option {}substituters http://127.0.0.1:{} {} {} -p {} --set {}",
                     ssh_tool,
                     (if use_substitutes { "extra-" } else { "" }),
                     nix_serve_port,
                     signing_key.map_or("--option require-sigs false", |_| ""),
+                    store.map_or("".to_string(), |s| format!("--store {}", s)),
                     profile_path,
                     path
                 )
             } else {
                 format!(
-                    "{} nix build --option {}substituters http://127.0.0.1:{} {} --print-missing -v --no-link {}",
+                    "{} nix build --option {}substituters http://127.0.0.1:{} {} {} --print-missing -v --no-link {}",
                     ssh_tool,
                     (if use_substitutes { "extra-" } else { "" }),
                     nix_serve_port,
                     signing_key.map_or("--option require-sigs false", |_| ""),
+                    store.map_or("".to_string(), |s| format!("--store {}", s)),
                     path
                 )
             };
@@ -114,6 +117,7 @@ fn deploy_system(
         use_substitutes,
         path,
         signing_key,
+        None,
         profile_path.as_deref(),
     )?;
 
@@ -181,6 +185,12 @@ fn main() {
                         .long("signing-key")
                         .help("File containing the secret signing key")
                         .value_name("/path/to/signing-key"),
+                )
+                .arg(
+                    Arg::with_name("store")
+                        .long("store")
+                        .help("Use different nix store root")
+                        .value_name("/mnt"),
                 )
                 .arg(
                     Arg::with_name("use-substitutes")
@@ -305,6 +315,7 @@ fn main() {
             path_matches.is_present("use-substitutes"),
             path_matches.value_of("PATH").unwrap(),
             path_matches.value_of("signing-key"),
+            path_matches.value_of("store"),
             path_matches.value_of("profile-path"),
         ),
         ("system", Some(system_matches)) => deploy_system(
