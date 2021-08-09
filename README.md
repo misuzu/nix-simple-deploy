@@ -115,11 +115,10 @@ $ nix-simple-deploy path --help
 Deploy a path to the NixOS target host
 
 USAGE:
-    nix-simple-deploy path [FLAGS] <PATH> --nix-serve-port <nix-serve-port> --signing-key </path/to/signing-key> --target-host <USER@HOST>
+    nix-simple-deploy path [FLAGS] [OPTIONS] <PATH> --target-host <USER@HOST>
 
 FLAGS:
     -h, --help               Prints help information
-    -p, --profile-path       Profile path
         --use-remote-sudo    When set, nix-simple-deploy prefixes remote commands that run on the --target-host systems
                              with sudo. Setting this option allows deploying using remote non-root user
     -s, --use-substitutes    Attempt to download missing paths on the target machine using Nix’s substitute mechanism.
@@ -127,10 +126,13 @@ FLAGS:
                              source
 
 OPTIONS:
-    -n, --nix-serve-port <nix-serve-port>       Port used for nix-serve, use this option if you have other services that
-                                                use port 9999 on local or remote machine [default: 9999]
-    -k, --signing-key </path/to/signing-key>    File containing the secret signing key
-    -t, --target-host <USER@HOST>               Specifies the NixOS target host
+        --extra-ssh-options <ssh-options>        Extra options for ssh binary
+    -n, --nix-serve-port <port>
+            Port used for nix-serve, use this option if you have other services that use port 9999 on local or remote
+            machine [default: 9999]
+    -p, --profile-path </path/to/nix/profile>    Profile path
+    -k, --signing-key </path/to/signing-key>     File containing the secret signing key
+    -t, --target-host <USER@HOST>                Specifies the NixOS target host
 
 ARGS:
     <PATH>    Nix store path
@@ -141,7 +143,7 @@ $ nix-simple-deploy system --help
 Deploy a system to the NixOS target host
 
 USAGE:
-    nix-simple-deploy system [FLAGS] <PATH> <ACTION> --nix-serve-port <nix-serve-port> --profile-path <profile-path> --signing-key </path/to/signing-key> --target-host <USER@HOST>
+    nix-simple-deploy system [FLAGS] [OPTIONS] <PATH> <ACTION> --target-host <USER@HOST>
 
 FLAGS:
     -h, --help               Prints help information
@@ -152,11 +154,13 @@ FLAGS:
                              source
 
 OPTIONS:
-    -n, --nix-serve-port <nix-serve-port>       Port used for nix-serve, use this option if you have other services that
-                                                use port 9999 on local or remote machine [default: 9999]
-    -p, --profile-path <profile-path>           Profile path [default: /nix/var/nix/profiles/system]
-    -k, --signing-key </path/to/signing-key>    File containing the secret signing key
-    -t, --target-host <USER@HOST>               Specifies the NixOS target host
+        --extra-ssh-options <ssh-options>        Extra options for ssh binary
+    -n, --nix-serve-port <port>
+            Port used for nix-serve, use this option if you have other services that use port 9999 on local or remote
+            machine [default: 9999]
+    -p, --profile-path </path/to/nix/profile>    Profile path [default: /nix/var/nix/profiles/system]
+    -k, --signing-key </path/to/signing-key>     File containing the secret signing key
+    -t, --target-host <USER@HOST>                Specifies the NixOS target host
 
 ARGS:
     <PATH>      Nix store path

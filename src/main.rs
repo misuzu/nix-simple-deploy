@@ -5,17 +5,23 @@ use std::fs;
 use std::process::exit;
 use std::time;
 
-fn get_ssh_tool(target_host: &str, nix_serve_port: u16, use_remote_sudo: bool) -> String {
+fn get_ssh_tool(
+    target_host: &str,
+    extra_ssh_options: Option<&str>,
+    nix_serve_port: u16,
+    use_remote_sudo: bool,
+) -> String {
+    let cmd = format!(
+        "ssh {} -R {}:127.0.0.1:{} {}",
+        extra_ssh_options.unwrap_or(""),
+        nix_serve_port,
+        nix_serve_port,
+        target_host
+    );
     if use_remote_sudo {
-        format!(
-            "ssh -R {}:127.0.0.1:{} {} sudo",
-            nix_serve_port, nix_serve_port, target_host
-        )
+        format!("{} sudo", cmd)
     } else {
-        format!(
-            "ssh -R {}:127.0.0.1:{} {}",
-            nix_serve_port, nix_serve_port, target_host
-        )
+        cmd
     }
 }
 
@@ -152,62 +158,10 @@ fn main() {
                         .required(true),
                 )
                 .arg(
-                    Arg::with_name("nix-serve-port")
-                        .short("n")
-                        .long("nix-serve-port")
-                        .help(
-                            "Port used for nix-serve, use this option \
-                              if you have other services that use port 9999 \
-                              on local or remote machine",
-                        )
-                        .default_value("9999")
-                        .required(true),
-                )
-                .arg(
-                    Arg::with_name("signing-key")
-                        .short("k")
-                        .long("signing-key")
-                        .help("File containing the secret signing key")
-                        .value_name("/path/to/signing-key"),
-                )
-                .arg(
-                    Arg::with_name("use-substitutes")
-                        .short("s")
-                        .long("use-substitutes")
-                        .help(
-                            "Attempt to download missing paths on the target \
-                             machine using Nix’s substitute mechanism. \
-                             Any paths that cannot be substituted on the \
-                             target are still copied normally from the source",
-                        ),
-                )
-                .arg(
-                    Arg::with_name("use-remote-sudo")
-                        .long("use-remote-sudo")
-                        .help(
-                            "When set, nix-simple-deploy prefixes remote commands \
-                             that run on the --target-host systems with sudo. \
-                             Setting this option allows deploying using remote non-root user",
-                        ),
-                )
-                .arg(
-                    Arg::with_name("profile-path")
-                        .short("p")
-                        .long("profile-path")
-                        .help("Profile path"),
-                )
-                .arg(Arg::with_name("PATH").help("Nix store path").required(true)),
-        )
-        .subcommand(
-            SubCommand::with_name("system")
-                .about("Deploy a system to the NixOS target host")
-                .arg(
-                    Arg::with_name("target-host")
-                        .short("t")
-                        .long("target-host")
-                        .help("Specifies the NixOS target host")
-                        .value_name("USER@HOST")
-                        .required(true),
+                    Arg::with_name("extra-ssh-options")
+                        .long("extra-ssh-options")
+                        .help("Extra options for ssh binary")
+                        .value_name("ssh-options"),
                 )
                 .arg(
                     Arg::with_name("nix-serve-port")
@@ -215,11 +169,11 @@ fn main() {
                         .long("nix-serve-port")
                         .help(
                             "Port used for nix-serve, use this option \
-                              if you have other services that use port 9999 \
-                              on local or remote machine",
+                             if you have other services that use port 9999 \
+                             on local or remote machine",
                         )
-                        .default_value("9999")
-                        .required(true),
+                        .value_name("port")
+                        .default_value("9999"),
                 )
                 .arg(
                     Arg::with_name("signing-key")
@@ -253,8 +207,73 @@ fn main() {
                         .short("p")
                         .long("profile-path")
                         .help("Profile path")
-                        .default_value("/nix/var/nix/profiles/system")
+                        .value_name("/path/to/nix/profile"),
+                )
+                .arg(Arg::with_name("PATH").help("Nix store path").required(true)),
+        )
+        .subcommand(
+            SubCommand::with_name("system")
+                .about("Deploy a system to the NixOS target host")
+                .arg(
+                    Arg::with_name("target-host")
+                        .short("t")
+                        .long("target-host")
+                        .help("Specifies the NixOS target host")
+                        .value_name("USER@HOST")
                         .required(true),
+                )
+                .arg(
+                    Arg::with_name("extra-ssh-options")
+                        .long("extra-ssh-options")
+                        .help("Extra options for ssh binary")
+                        .value_name("ssh-options"),
+                )
+                .arg(
+                    Arg::with_name("nix-serve-port")
+                        .short("n")
+                        .long("nix-serve-port")
+                        .help(
+                            "Port used for nix-serve, use this option \
+                             if you have other services that use port 9999 \
+                             on local or remote machine",
+                        )
+                        .value_name("port")
+                        .default_value("9999"),
+                )
+                .arg(
+                    Arg::with_name("signing-key")
+                        .short("k")
+                        .long("signing-key")
+                        .help("File containing the secret signing key")
+                        .value_name("/path/to/signing-key"),
+                )
+                .arg(
+                    Arg::with_name("use-substitutes")
+                        .short("s")
+                        .long("use-substitutes")
+                        .help(
+                            "Attempt to download missing paths on the target \
+                             machine using Nix’s substitute mechanism. \
+                             Any paths that cannot be substituted on the \
+                             target are still copied normally from the source",
+                        ),
+                )
+                .arg(
+                    Arg::with_name("use-remote-sudo")
+                        .long("use-remote-sudo")
+                        .help(
+                            "When set, nix-simple-deploy prefixes remote commands \
+                             that run on the --target-host systems with sudo. \
+                             Setting this option allows deploying using remote non-root user",
+                        ),
+                )
+                .arg(
+                    Arg::with_name("profile-path")
+                        .short("p")
+                        .long("profile-path")
+                        .help("Profile path")
+                        .value_name("/path/to/nix/profile")
+                        .default_value("/nix/var/nix/profiles/system"),
                 )
                 .arg(Arg::with_name("PATH").help("Nix store path").required(true))
                 .arg(
@@ -270,6 +289,7 @@ fn main() {
         ("path", Some(path_matches)) => deploy_path(
             &get_ssh_tool(
                 path_matches.value_of("target-host").unwrap(),
+                path_matches.value_of("extra-ssh-options"),
                 path_matches
                     .value_of("nix-serve-port")
                     .unwrap()
@@ -290,6 +310,7 @@ fn main() {
         ("system", Some(system_matches)) => deploy_system(
             &get_ssh_tool(
                 system_matches.value_of("target-host").unwrap(),
+                system_matches.value_of("extra-ssh-options"),
                 system_matches
                     .value_of("nix-serve-port")
                     .unwrap()
